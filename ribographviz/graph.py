@@ -237,30 +237,33 @@ class RNAGraph:
                     node_positions_x[stem[j][1]] = x_midpoint - x_diff
                     node_positions_y[stem[j][0]] = y_midpoint + y_diff
                     node_positions_y[stem[j][1]] = y_midpoint - y_diff
-            return node_positions_x, node_positions_y
+        return node_positions_x, node_positions_y
 
     def _configure_positions(self, subgraph):
-        pos = graphviz_layout(subgraph, prog="neato")
+        graph_positions = graphviz_layout(subgraph, prog="neato")
+
+        # If single-molecule, get the 5 and 3' end coordinates
         if not self.is_multi:
-            self.fiveprime_x, self.fiveprime_y = pos["5'"]
-
+            self.fiveprime_x, self.fiveprime_y = graph_positions["5'"]
             if "3'" in list(subgraph.nodes()):
-                self.threeprime_x, self.threeprime_y = pos["3'"]
+                self.threeprime_x, self.threeprime_y = graph_positions["3'"]
 
+        # Compute the bond width
         for u, v in list(subgraph.edges()):
-            if not (u.startswith("n") and v.startswith("n")):
+            if not (u.startswith('n') and v.startswith('n')):
                 continue
-            x1, x2, y1, y2 = pos[u][0], pos[v][0], pos[u][1], pos[v][1]
+            x1, x2, y1, y2 = graph_positions[u][0], graph_positions[v][0], graph_positions[u][1], graph_positions[v][1]
             break
         bond_width = np.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
 
         node_positions_x, node_positions_y = {}, {}
         for node in list(subgraph.nodes()):
-            if node.startswith("n"):
+            if node.startswith('n'):
                 seq_ind = int(node[1:])
-                node_positions_x[seq_ind] = pos[node][0]
-                node_positions_y[seq_ind] = pos[node][1]
-        return pos, bond_width, node_positions_x, node_positions_y
+                node_positions_x[seq_ind] = graph_positions[node][0]
+                node_positions_y[seq_ind] = graph_positions[node][1]
+
+        return graph_positions, bond_width, node_positions_x, node_positions_y
 
     def _compute_alignment_angle(self, align_mode, node_pos_list_x, node_pos_list_y):
         if align_mode == "end":
@@ -324,6 +327,19 @@ class RNAGraph:
             self.fiveprime_x /= bond_width
             self.fiveprime_y /= bond_width
 
+    def _add_flank_nodes(self, subgraph):
+        # 5' end
+        if "n0" in list(subgraph.nodes()):
+            subgraph.add_edge("n0", "5'", len=2)
+        else:
+            subgraph.add_edge("h1b", "5'", len=2)
+
+        # 3' end
+        if "n%d" % (self.N - 1) in list(subgraph.nodes()):
+            subgraph.add_edge("n%d" % (self.N - 1), "3'", len=2)
+
+        return subgraph
+
     def get_coordinates(
         self,
         align=False,
@@ -349,24 +365,17 @@ class RNAGraph:
         subgraph = self.G.subgraph(plot_nodes)
         subgraph = subgraph.to_undirected()
 
+        # Add nodes specifically for the 5' and 3' ends
         if not self.is_multi:
-            # locate 5' nucleotide
-            if "n0" in list(subgraph.nodes()):
-                subgraph.add_edge("n0", "5'", len=2)
-            else:
-                subgraph.add_edge("h1b", "5'", len=2)
+            subgraph = self._add_flank_nodes(subgraph)
 
-            # locate 3' nucleotide. Only located if in a distinct string, otherwise can't distinguish end of outer stem.
-            if "n%d" % (self.N - 1) in list(subgraph.nodes()):
-                subgraph.add_edge("n%d" % (self.N - 1), "3'", len=2)
+        graph_positions, bond_width, node_positions_x, node_positions_y = self._configure_positions(subgraph)
+        node_positions_x, node_positions_y = self._update_stem_coordinates(node_positions_x, node_positions_y,
+                                                                                   graph_positions, bond_width)
+        self._update_flank_coordinates(node_positions_x, node_positions_y)
 
-        pos, bond_width, node_positions_x, node_positions_y = self._configure_positions(subgraph)
-        node_positions_x, node_positions_y = self._update_stem_coordinates(self, node_positions_x, node_positions_y,
-                                                                           pos, bond_width)
-        self._update_flank_coordinates(self, node_positions_x, node_positions_y)
         node_pos_list_x = [node_positions_x[i] - node_positions_x[0] for i in range(self.N)]
         node_pos_list_y = [node_positions_y[i] - node_positions_y[0] for i in range(self.N)]
-
         if align:
             node_pos_list_x, node_pos_list_y = self._align(align_mode, node_pos_list_x, node_pos_list_y, bond_width)
 

@@ -96,7 +96,7 @@ def parse_stems_from_bps(bps, debug=False):
                 bp_next[0] = copy(bp_next)[0] + 1
                 bp_next[1] = copy(bp_next)[1] - 1
 
-                if not len(bps > 0):
+                if not len(bps) > 0:
                     continue
                 gp = find_all([x[0] for x in bps], [bp_next[0]])
 
