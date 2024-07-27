@@ -20,7 +20,7 @@ def find_all(text: str, query: str | list[str]) -> list[int]:
         list of int: A list of indices where the characters in `ch` are found in `s`.
     """
     if isinstance(query, str):
-        query = [query]  # Convert a single character to a list for uniform processing
+        query = [query]
 
     return [i for i, ltr in enumerate(text) if ltr in query]
 
@@ -37,15 +37,15 @@ def pairs_from_dotbracket(structure: str) -> list[list[int, int]]:
 
     other_delimiters = [k for k in Counter(structure) if k not in RIGHT_DELIMITERS + LEFT_DELIMITERS + ["."]]
 
-    bps = []
+    pairs = []
     for delimiter in other_delimiters:
-        pos = find_all(structure, delimiter)
+        index = find_all(structure, delimiter)
 
-        n = int(len(pos) / 2)
-        i, j = pos[:n], pos[n:]
+        n = int(len(index) / 2)
+        i, j = index[:n], index[n:]
 
         for ind in range(n):
-            bps.append([i[ind], j[-1 - ind]])
+            pairs.append([i[ind], j[-1 - ind]])
 
     for left_delimiter, right_delimiter in list(zip(LEFT_DELIMITERS, RIGHT_DELIMITERS, strict=True)):
         left_indices = []
@@ -53,9 +53,9 @@ def pairs_from_dotbracket(structure: str) -> list[list[int, int]]:
             if char == left_delimiter:
                 left_indices.append(i)
             elif char == right_delimiter and left_indices:
-                bps.append([left_indices.pop(), i])
+                pairs.append([left_indices.pop(), i])
 
-    return bps
+    return pairs  # type: ignore
 
 
 def stems_from_pairs(pairs: list[list[int, int]]) -> list[list[list[int]]]:
@@ -88,22 +88,24 @@ def stems_from_pairs(pairs: list[list[int, int]]) -> list[list[list[int]]]:
         while bp_next[0] > 0:
             bp_next = [bp_next[0] - 1, bp_next[1] + 1]
             matching_pairs = [p for p in pairs if p[0] == bp_next[0] and p[1] == bp_next[1]]
-            if matching_pairs:
-                stem.append(bp_next)
-                pairs.remove(matching_pairs[0])
-            else:
+
+            if not matching_pairs:
                 break
+
+            stem.append(bp_next)
+            pairs.remove(matching_pairs[0])
 
         # Check inward
         bp_next = bp.copy()
         while bp_next[0] < nres:
             bp_next = [bp_next[0] + 1, bp_next[1] - 1]
             matching_pairs = [p for p in pairs if p[0] == bp_next[0] and p[1] == bp_next[1]]
-            if matching_pairs:
-                stem.insert(0, bp_next)
-                pairs.remove(matching_pairs[0])
-            else:
+
+            if not matching_pairs:
                 break
+
+            stem.insert(0, bp_next)
+            pairs.remove(matching_pairs[0])
 
         stems.append(stem)
 
