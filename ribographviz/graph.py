@@ -31,8 +31,6 @@ class RNAGraph:
          values hold the number of unpaired bases present in each loop.
         """
 
-        self._chainbreak, self.structure = utils.parse_out_chainbreak(structure)
-
         self.stems = sorted(utils.stems_from_pairs(utils.pairs_from_dotbracket(self.structure)))
         self.stem_assignment = utils.get_stem_assignment(self.structure)
         self.pairmap = utils.get_pairmap(self.structure)
@@ -78,10 +76,9 @@ class RNAGraph:
                 else:
                     raise ValueError(f"Unexpected character in structure: {self.structure[i - 1]}")
 
-                if i not in self._chainbreak:
-                    self.graph.add_edge(
-                        "n%d" % i, "h%d%s" % (self.stem_assignment[i - 1], letter), len=1.25, mld_weight=0
-                    )
+                self.graph.add_edge(
+                    "n%d" % i, "h%d%s" % (self.stem_assignment[i - 1], letter), len=1.25, mld_weight=0
+                )
                 # TODO: add helix_a node here
 
             if stem_assignment_right[i] > 0:
@@ -92,10 +89,9 @@ class RNAGraph:
                 else:
                     raise ValueError(f"Unexpected character in structure: {self.structure[i - 1]}")
 
-                if i + 1 not in self._chainbreak:
-                    self.graph.add_edge(
-                        "n%d" % i, "h%d%s" % (self.stem_assignment[i + 1], letter), len=1.25, mld_weight=0
-                    )
+                self.graph.add_edge(
+                    "n%d" % i, "h%d%s" % (self.stem_assignment[i + 1], letter), len=1.25, mld_weight=0
+                )
 
                     # TODO: add helix_b node here
 
@@ -104,7 +100,7 @@ class RNAGraph:
         nuc_nodes = [n for n in list(self.graph.nodes) if isinstance(n, str) and n.startswith("n")]  # hacky
         for nuc in nuc_nodes:
             ind = int(nuc.replace("n", ""))
-            if ("n%d" % (ind - 1) in nuc_nodes) and (ind not in self._chainbreak):
+            if ("n%d" % (ind - 1) in nuc_nodes):
                 self.graph.add_edge("n%d" % (ind - 1), "n%d" % ind, len=1, mld_weight=0)
 
     def create_graph(self):
@@ -139,7 +135,7 @@ class RNAGraph:
 
             if self.structure[i : i + 2] in left_left_same:
                 self.graph.add_edge("h%da" % stem_ind_1, "h%db" % stem_ind_2, len=1, weight=1, mld_weight=0)
-            elif (self.structure[i : i + 2] in right_left) and (i + 1 not in self._chainbreak):
+            elif (self.structure[i : i + 2] in right_left):
                 self.graph.add_edge("h%db" % stem_ind_1, "h%db" % stem_ind_2, len=1, weight=1, mld_weight=0)
             elif self.structure[i : i + 2] in right_right_same:
                 self.graph.add_edge("h%db" % stem_ind_1, "h%da" % stem_ind_2, len=1, weight=1, mld_weight=0)
