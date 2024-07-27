@@ -245,19 +245,6 @@ class RNAGraph:
 
         return graph_positions, bond_width, node_positions_x, node_positions_y
 
-    def _compute_alignment_angle(self, align_mode, node_pos_list_x, node_pos_list_y):
-        if align_mode == "end":
-            vec_01_x = node_pos_list_x[self._n_bases - 1]
-            vec_01_y = node_pos_list_y[self._n_bases - 1]
-        elif align_mode == "COM":
-            vec_01_x = np.mean(node_pos_list_x)
-            vec_01_y = np.mean(node_pos_list_y)
-        elif isinstance(align_mode, int):
-            vec_01_x = node_pos_list_x[align_mode]
-            vec_01_y = node_pos_list_y[align_mode]
-        else:
-            raise ValueError("Alignment mode not recognized.")
-        return np.arctan2(vec_01_y, vec_01_x)
 
     def _add_flank_nodes(self, subgraph):
         # 5' end
