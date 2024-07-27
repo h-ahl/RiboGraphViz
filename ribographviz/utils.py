@@ -14,7 +14,7 @@ def find_all(text: str, query: str | list[str]) -> list[int]:
 
     Args:
         text: The string to search within.
-        query (str or list of str): A character or a list of characters to find in the string.
+        query: A character or a list of characters to find in the string.
 
     Returns:
         list of int: A list of indices where the characters in `ch` are found in `s`.
@@ -62,7 +62,7 @@ def stems_from_pairs(pairs: list[list[int, int]]) -> list[list[list[int]]]:
     """Extracts stems from a list of base pairs. A stem is a sequence of continuous base pairs.
 
     Args:
-        List of base pairs [i, j].
+        pairs: List of base pairs [i, j].
 
     Returns:
         List of stems, where each stem is a list of base pairs.
