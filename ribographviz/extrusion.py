@@ -34,7 +34,7 @@ def extract_stacks(sequence: str, structure: str, data: list | None = None, stac
     full_list_motifs = []
     full_list_data = []
 
-    for stem in mdl.stems:
+    for stem in mdl._stems:
         for stack_ind in range(len(stem) - stack_size + 1):
             stack = stem[stack_ind : stack_ind + stack_size]
 
@@ -89,7 +89,7 @@ def extract_loops(sequence: str, structure: str, data: list | None = None, n_nei
     rg = RNAGraph(structure, sequence=sequence)
 
     nodes = [n for n in list(rg.graph.nodes) if not isinstance(n, str)]
-    string_assignment = "".join(["%d" % int(x) for x in rg.stem_assignment])
+    string_assignment = "".join(["%d" % int(x) for x in rg._stem_assignment])
     full_list_motifs = []
     full_list_data = []
 

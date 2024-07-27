@@ -16,14 +16,14 @@ class RNAGraph:
     """TODO: """
     structure: str
     sequence: str | None = None
-    fiveprime_x = None
-    fiveprime_y = None
-    threeprime_x = None
-    threeprime_y = None
+    fiveprime_x: float | None = None
+    fiveprime_y: float | None = None
+    threeprime_x: float | None = None
+    threeprime_y: float | None = None
 
     def __init__(self, structure: str, sequence: str | None = None):
         """Create a directed graph representing an RNA secondary structure, where nodes represent hairpin loops,
-        internal loops, bulges, anything not a helix, and stems represent helices.
+        internal loops, bulges, anything not a helix, and _stems represent helices.
 
         Edge weights (lengths) are equal to the number of base pairs present in the helix. Nodes are sized according to
         the number of unpaired bases in the loop.
@@ -36,36 +36,35 @@ class RNAGraph:
         self.sequence = sequence
         self.structure = structure
 
-        self.stems = sorted(utils.stems_from_pairs(utils.pairs_from_dotbracket(structure)))
-        self.stem_assignment = utils.get_stem_assignment(self.structure)
-        self.pairmap = utils.get_pairmap(self.structure)
-
-        self.loop_sizes = {0: 0}
+        self._stems = sorted(utils.stems_from_pairs(utils.pairs_from_dotbracket(structure)))
+        self._stem_assignment = utils.get_stem_assignment(self.structure)
+        self._pairmap = utils.get_pairmap(self.structure)
+        self._loop_sizes = {0: 0}
         self._n_bases = len(self.structure)
 
         self.create_graph()
 
     def _edges_from_pairmap(self):
-        """Process the pairmap to add the edges to the graph and get the loop sizes."""
+        """Process the _pairmap to add the edges to the graph and get the loop sizes."""
         jj = 0
-        while jj < len(self.pairmap):
-            if self.pairmap[jj] > jj:  # in structure
-                self.add_edges(jj, self.pairmap[jj], 0, 0)
-                jj = self.pairmap[jj] + 1
+        while jj < len(self._pairmap):
+            if self._pairmap[jj] > jj:  # in structure
+                self.add_edges(jj, self._pairmap[jj], 0, 0)
+                jj = self._pairmap[jj] + 1
             else:  # external loop
                 jj += 1
-                self.loop_sizes[0] += 1
+                self._loop_sizes[0] += 1
 
     def _remove_self_referencing_edges(self):
         """Remove edges that point to the same node."""
-        for nod in range(len(self.stem_assignment)):
+        for nod in range(len(self._stem_assignment)):
             if (nod, nod) in self.graph.edges:
                 self.graph.remove_edge(nod, nod)
 
     def _process_helix_nodes(self):
-        stem_assignment_left = np.concatenate([np.array([-1]), self.stem_assignment[:-1]])
-        stem_assignment_right = np.concatenate([self.stem_assignment[1:], np.array([-1])])
-        for i, pair in enumerate(self.pairmap):
+        stem_assignment_left = np.concatenate([np.array([-1]), self._stem_assignment[:-1]])
+        stem_assignment_right = np.concatenate([self._stem_assignment[1:], np.array([-1])])
+        for i, pair in enumerate(self._pairmap):
             if pair != -1:
                 continue
 
@@ -80,7 +79,7 @@ class RNAGraph:
 
                 self.graph.add_edge(
                     f"n{i}",
-                    f"h{self.stem_assignment[i - 1]}{letter}",
+                    f"h{self._stem_assignment[i - 1]}{letter}",
                     len=1.25,
                     mld_weight=0
                 )
@@ -96,7 +95,7 @@ class RNAGraph:
 
                 self.graph.add_edge(
                     f"n{i}",
-                    f"h{self.stem_assignment[i + 1]}{letter}",
+                    f"h{self._stem_assignment[i + 1]}{letter}",
                     len=1.25,
                     mld_weight=0
                 )
@@ -104,22 +103,22 @@ class RNAGraph:
 
     def _process_nucleotide_nodes(self):
         """TODO: """
-        nuc_nodes = [n for n in list(self.graph.nodes) if isinstance(n, str) and n.startswith("n")]  # hacky
-        for nuc in nuc_nodes:
+        nucleotide_nodes = [n for n in list(self.graph.nodes) if isinstance(n, str) and n.startswith("n")]  # hacky
+        for nuc in nucleotide_nodes:
             ind = int(nuc.replace("n", ""))
-            if ("n%d" % (ind - 1) in nuc_nodes):
+            if f"n{ind - 1}" in nucleotide_nodes:
                 self.graph.add_edge("n%d" % (ind - 1), "n%d" % ind, len=1, mld_weight=0)
 
     def create_graph(self):
-        """Create graph by reading pairmap array and recursively creating edges."""
+        """Create graph by reading _pairmap array and recursively creating edges."""
         self.graph.add_node(0)
         self._edges_from_pairmap()
         self._remove_self_referencing_edges()
         self._process_helix_nodes()
         self._process_nucleotide_nodes()
 
-        for stem_ind in range(1, len(self.stems) + 1):
-            stem_length = len(self.stems[stem_ind - 1])
+        for stem_ind in range(1, len(self._stems) + 1):
+            stem_length = len(self._stems[stem_ind - 1])
 
             self.graph.add_edge(
                 f"h{stem_ind}a",
@@ -129,23 +128,25 @@ class RNAGraph:
             )
 
         for i in range(self._n_bases - 1):
-            if not ((self.stem_assignment[i + 1] != self.stem_assignment[i]) and
-                    (self.stem_assignment[i + 1] != 0.0 and self.stem_assignment[i] != 0.0)):
+            if not ((self._stem_assignment[i + 1] != self._stem_assignment[i]) and
+                    (self._stem_assignment[i + 1] != 0.0 and self._stem_assignment[i] != 0.0)):
                 continue
-
-            stem_ind_1 = self.stem_assignment[i]
-            stem_ind_2 = self.stem_assignment[i + 1]
 
             left_left_same = [x + x for x in LEFT_DELIMITERS]
             right_left = [x[0] + x[1] for x in list(itertools.product(RIGHT_DELIMITERS, LEFT_DELIMITERS))]
             right_right_same = [x + x for x in RIGHT_DELIMITERS]
 
-            if self.structure[i : i + 2] in left_left_same:
-                self.graph.add_edge("h%da" % stem_ind_1, "h%db" % stem_ind_2, len=1, weight=1, mld_weight=0)
-            elif (self.structure[i : i + 2] in right_left):
-                self.graph.add_edge("h%db" % stem_ind_1, "h%db" % stem_ind_2, len=1, weight=1, mld_weight=0)
+            stem_ind_1 = self._stem_assignment[i]
+            stem_ind_2 = self._stem_assignment[i + 1]
+            if self.structure[i: i + 2] in left_left_same:
+                self.graph.add_edge(f"h{stem_ind_1}a", f"h{stem_ind_2}b", len=1, weight=1,
+                                    mld_weight=0)
+            elif self.structure[i : i + 2] in right_left:
+                self.graph.add_edge(f"h{stem_ind_1}b", f"h{stem_ind_2}b", len=1, weight=1,
+                                    mld_weight=0)
             elif self.structure[i : i + 2] in right_right_same:
-                self.graph.add_edge("h%db" % stem_ind_1, "h%da" % stem_ind_2, len=1, weight=1, mld_weight=0)
+                self.graph.add_edge(f"h{stem_ind_1}b", f"h{stem_ind_2}a", len=1, weight=1,
+                                    mld_weight=0)
 
     def add_edges(self, start_index, end_index, last_helix, last_loop):
         """Recursive method to add edges to graph."""
@@ -153,36 +154,36 @@ class RNAGraph:
         if start_index > end_index:
             raise ValueError("start_index > end_index")
 
-        if self.pairmap[start_index] == end_index:
-            self.add_edges(start_index + 1, end_index - 1, self.stem_assignment[start_index], last_loop)
+        if self._pairmap[start_index] == end_index:
+            self.add_edges(start_index + 1, end_index - 1, self._stem_assignment[start_index], last_loop)
 
         else:
             jj = start_index
             while jj <= end_index:
-                if self.pairmap[jj] > jj:
+                if self._pairmap[jj] > jj:
                     self.graph.add_edge(
                         int(last_loop), int(last_helix)
                     )
                     last_loop = copy(last_helix)
 
-                    self.add_edges(jj, self.pairmap[jj], self.stem_assignment[jj], last_loop)
-                    jj = self.pairmap[jj] + 1  # leaving helix
+                    self.add_edges(jj, self._pairmap[jj], self._stem_assignment[jj], last_loop)
+                    jj = self._pairmap[jj] + 1  # leaving helix
                 else:
                     if last_helix not in list(self.graph.nodes):
                         self.graph.add_edge(
                             int(last_loop),
                             int(last_helix),
-                            len=len(self.stems[int(last_helix - 1)]),
-                            weight=len(self.stems[int(last_helix - 1)]),
+                            len=len(self._stems[int(last_helix - 1)]),
+                            weight=len(self._stems[int(last_helix - 1)]),
                             mld_weight=0,
                         )
 
                         last_loop = copy(last_helix)
 
-                    if int(last_helix) not in self.loop_sizes:
-                        self.loop_sizes[int(last_helix)] = 0
+                    if int(last_helix) not in self._loop_sizes:
+                        self._loop_sizes[int(last_helix)] = 0
 
-                    self.loop_sizes[int(last_helix)] += 1
+                    self._loop_sizes[int(last_helix)] += 1
 
                     jj += 1
 
@@ -196,7 +197,7 @@ class RNAGraph:
             self.fiveprime_y = self.fiveprime_y - node_positions_y[0]
 
     def _update_stem_coordinates(self, node_positions_x, node_positions_y, pos, bond_width):
-        for i, stem in enumerate(self.stems):
+        for i, stem in enumerate(self._stems):
             start_x, start_y = pos["h%da" % (i + 1)]
             fin_x, fin_y = pos["h%db" % (i + 1)]
 
@@ -252,7 +253,6 @@ class RNAGraph:
 
         return graph_positions, bond_width, node_positions_x, node_positions_y
 
-
     def _add_flank_nodes(self, subgraph):
         # 5' end
         if "n0" in list(subgraph.nodes()):
@@ -266,20 +266,10 @@ class RNAGraph:
 
         return subgraph
 
-    def get_coordinates(
-        self,
-        return_pos_dict=False,
-        helices_to_flip=None,
-        move_coord_groups=None,
-        rotate_groups=None,
-    ):
+    def get_coordinates(self):
         """
         Return: array of x_coords, array of y_coords
         """
-        rotate_groups = rotate_groups or []
-        move_coord_groups = move_coord_groups or []
-        helices_to_flip = helices_to_flip or []
-
         plot_nodes = [n for n in list(self.graph.nodes) if isinstance(n, str)]
         subgraph = self.graph.subgraph(plot_nodes)
         subgraph = subgraph.to_undirected()
@@ -307,20 +297,7 @@ class RNAGraph:
             self.fiveprime_x /= bond_width
             self.fiveprime_y /= bond_width
 
-        for left, right in helices_to_flip:
-            node_pos_list_x, node_pos_list_y = utils.flip_helix(node_pos_list_x, node_pos_list_y, left, right)
-        for offset, group in move_coord_groups:
-            node_pos_list_x, node_pos_list_y = utils.translate_group(node_pos_list_x, node_pos_list_y, offset, group)
-        for angle, group in rotate_groups:
-            node_pos_list_x, node_pos_list_y = utils.rotate_group(node_pos_list_x, node_pos_list_y, angle, group)
-
-        if return_pos_dict:
-            coord_dict = {}
-            for i in range(len(node_pos_list_x)):
-                coord_dict[i] = np.array([node_pos_list_x[i], node_pos_list_y[i]])
-            return coord_dict
-        else:
-            return node_pos_list_x, node_pos_list_y
+        return node_pos_list_x, node_pos_list_y
 
     def draw(
         self,
@@ -356,7 +333,6 @@ class RNAGraph:
 
         x_coords, y_coords = self.get_coordinates()
 
-        # fig = plt.gcf()
         ax = ax or plt.gca()
         ax.set_aspect("equal")
 
@@ -384,7 +360,6 @@ class RNAGraph:
         ax.set_xlim([np.min(x_coords) - 5 + x0, np.max(x_coords) + 5 + x0])
         ax.set_ylim([np.min(y_coords) - 5 + y0, np.max(y_coords) + 5 + y0])
 
-        # TODO: Implement line mode
         if alpha is None:
             alpha = [1] * self._n_bases
         elif isinstance(alpha, float):
@@ -415,39 +390,3 @@ class RNAGraph:
 
         ax.axis("off")
         return ax
-
-    def compute_structure_features(self):
-        self.max_ladder_distance()
-        self.n_hairpins, self.n_internal_loops, self.n_3WJs, self.n_4WJs, self.n_5WJs_up = self.count_loops()
-
-    def max_ladder_distance(self):
-        """Computes the maximum ladder distance. This is defined as the end-to-end distance of helices present in
-        structure, not counting lengths of loops."""
-        nodes = list(self.graph.nodes)
-        subgraph = self.graph.subgraph(nodes).to_undirected()
-
-        first_helix_node = next((n for n in nodes if isinstance(n, str) and n.startswith("h")), None)
-
-        if first_helix_node is None:
-            self.max_ladder_distance = 0
-        else:
-            node1 = list(nx.traversal.bfs_edges(subgraph, first_helix_node))[-1][-1]
-            node2 = list(nx.traversal.bfs_edges(subgraph, node1))[-1][-1]
-
-            self.max_ladder_distance = nx.shortest_path_length(subgraph, node1, node2, weight="mld_weight")
-
-    def count_loops(self):
-        degree_counts = {1: 0, 2: 0, 3: 0, 4: 0, 'more_than_4': 0}
-        nodes = [n for n in self.graph.nodes if not isinstance(n, str)]
-        subgraph = self.graph.subgraph(nodes).to_undirected()
-
-        for _, degree in subgraph.degree:
-            if degree in degree_counts:
-                degree_counts[degree] += 1
-            else:
-                degree_counts['more_than_4'] += 1
-
-        # Subtract one from the count of nodes with degree 1 to account for the exterior loop
-        degree_counts[1] = max(0, degree_counts[1] - 1)
-
-        return (degree_counts[1], degree_counts[2], degree_counts[3], degree_counts[4], degree_counts['more_than_4'])

@@ -1,6 +1,5 @@
 """Copied from ToyFold 1D utils (Rhiju Das' Matlab code originally)."""
 
-import math
 from collections import Counter
 
 import numpy as np
@@ -59,13 +58,13 @@ def pairs_from_dotbracket(structure: str) -> list[list[int, int]]:
 
 
 def stems_from_pairs(pairs: list[list[int, int]]) -> list[list[list[int]]]:
-    """Extracts stems from a list of base pairs. A stem is a sequence of continuous base pairs.
+    """Extracts _stems from a list of base pairs. A stem is a sequence of continuous base pairs.
 
     Args:
         pairs: List of base pairs [i, j].
 
     Returns:
-        List of stems, where each stem is a list of base pairs.
+        List of _stems, where each stem is a list of base pairs.
 
     Examples:
         >>> stems_from_pairs(pairs_from_dotbracket("((.))"))  # [[0,4],[1,3]]
@@ -128,7 +127,7 @@ def get_stem_assignment(structure: str) -> np.ndarray:
     else:
         pairs = pairs_from_dotbracket(structure)
 
-    # Extract stems and create assignment array
+    # Extract _stems and create assignment array
     stems = stems_from_pairs(pairs)
     stem_assignment = np.zeros(len(structure), dtype=int)
 
@@ -178,88 +177,3 @@ def get_pairmap(structure: str) -> list[int]:
             pairs_array[end_stack[-ii]] = pair_stack[ii]
 
     return pairs_array
-
-
-def flip_helix(x, y, left_indices, right_indices):
-    """Reflects points over the center line between two groups.
-
-    Args:
-        x: x-coordinates of points.
-        y: y-coordinates of points.
-        left_indices: Indices of points in the left group.
-        right_indices: Indices of points in the right group.
-
-    Returns:
-        Updated x and y-coordinates of reflected points.
-    """
-
-    class1 = []
-    class2 = []
-    labels1 = []
-    labels2 = []
-    for i in left_indices:
-        class1.append(np.array([x[i], y[i]]))
-        labels1.append(-1)
-    for i in right_indices:
-        class2.append(np.array([x[i], y[i]]))
-        labels1.append(1)
-    class1 = np.array(class1)
-    class2 = np.array(class2)
-    x = np.vstack((class1, class2))
-    x = np.array([np.ones(len(x)), x[:, 0], x[:, 1]]).T
-    y = np.concatenate((labels1, labels2)).T
-    beta = np.linalg.inv(x.T @ x) @ (x.T @ y)
-
-    # Reflect all points over center line
-    for i in left_indices + right_indices:
-        temp = -2 * (beta[0] + beta[1] * x[i] + beta[2] * y[i]) / (beta[1] ** 2 + beta[2] ** 2)
-        x[i] = temp * beta[1] + x[i]
-        y[i] = temp * beta[2] + y[i]
-    return x, y
-
-
-def translate_group(x: list[float], y: list[float], offset: tuple[float, float], group: list[int]) -> tuple[
-    list[float], list[float]]:
-    """Moves points in `group` by the specified `offset`.
-
-    Args:
-        x: x-coordinates of points.
-        y: y-coordinates of points.
-        offset: (x, y) offset for movement.
-        group: Indices of points to move.
-
-    Returns:
-        tuple of list of float: Updated x and y-coordinates of points.
-    """
-
-    for i in group:
-        x[i] += offset[0]
-        y[i] += offset[1]
-    return x, y
-
-
-def rotate_group(x: list[float], y: list[float], angle: float, group: list[int]) -> tuple[list[float], list[float]]:
-    """Rotates points in `group` around their centroid by `angle` degrees.
-
-    Args:
-        x: x-coordinates of points.
-        y: y-coordinates of points.
-        angle: Rotation angle in degrees.
-        group: Indices of points to rotate.
-
-    Returns:
-        Updated x and y-coordinates of points.
-    """
-    rotation = math.radians(angle)
-    sum_x = 0
-    sum_y = 0
-    num_points = len(group)
-    for i in group:
-        sum_x += x[i]
-        sum_y += y[i]
-    centroid = [sum_x / num_points, sum_y / num_points]
-    for i in group:
-        x_orig = x[i]
-        x[i] = centroid[0] + math.cos(rotation) * (x[i] - centroid[0]) - math.sin(rotation) * (y[i] - centroid[1])
-        y[i] = centroid[1] + math.sin(rotation) * (x_orig - centroid[0]) + math.cos(rotation) * (y[i] - centroid[1])
-    return x, y
