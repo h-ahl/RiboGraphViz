@@ -88,7 +88,7 @@ def extract_loops(sequence: str, structure: str, data: list | None = None, n_nei
     assert len(sequence) == len(structure)
     rg = RNAGraph(structure, sequence=sequence)
 
-    nodes = [n for n in list(rg.G.nodes) if not isinstance(n, str)]
+    nodes = [n for n in list(rg.graph.nodes) if not isinstance(n, str)]
     string_assignment = "".join(["%d" % int(x) for x in rg.stem_assignment])
     full_list_motifs = []
     full_list_data = []
@@ -98,7 +98,7 @@ def extract_loops(sequence: str, structure: str, data: list | None = None, n_nei
         loop_seq = []
         loop_data = []
 
-        children = list(rg.G[i])
+        children = list(rg.graph[i])
         lst = [i] + children + [i]
 
         for j in range(len(lst) - 1):

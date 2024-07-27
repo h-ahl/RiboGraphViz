@@ -2,283 +2,252 @@
 
 import math
 from collections import Counter
-from copy import copy
 
-import matplotlib.pyplot as plt
-import networkx as nx
 import numpy as np
-from loguru import logger
-from matplotlib.lines import Line2D
-from networkx.drawing.nx_agraph import graphviz_layout
+
+LEFT_DELIMITERS = ["(", "{", "[", "<"]
+RIGHT_DELIMITERS = [")", "}", "]", ">"]
 
 
-def find_all(s, ch):
-    if isinstance(ch, list):
-        tmp_list = []
-        for c in ch:
-            tmp_list.extend([i for i, ltr in enumerate(s) if ltr == c])
-        return tmp_list
-    elif isinstance(ch, str):
-        return [i for i, ltr in enumerate(s) if ltr == ch]
+def find_all(text: str, query: str | list[str]) -> list[int]:
+    """Finds all indices of characters in a string `s` that match any character in `ch`.
+
+    Args:
+        text: The string to search within.
+        query (str or list of str): A character or a list of characters to find in the string.
+
+    Returns:
+        list of int: A list of indices where the characters in `ch` are found in `s`.
+    """
+    if isinstance(query, str):
+        query = [query]  # Convert a single character to a list for uniform processing
+
+    return [i for i, ltr in enumerate(text) if ltr in query]
 
 
-def convert_structure_to_bps(structure):
+def pairs_from_dotbracket(structure: str) -> list[list[int, int]]:
+    """Returns a list of base pairs from an RNA secondary structure in dot-bracket notation.
+
+    Args:
+        structure: RNA secondary structure in dot-bracket notation.
+
+    Returns:
+        A list of base pairs, each represented as a list of two indices [i, j].
+    """
+
+    other_delimiters = [k for k in Counter(structure) if k not in RIGHT_DELIMITERS + LEFT_DELIMITERS + ["."]]
+
     bps = []
-
-    # Find other delimiters
-    other_delimiters = [k for k in Counter(structure) if k not in [".", "(", ")", "[", "]", "{", "}", "<", ">"]]
-
-    for delim in other_delimiters:
-        pos = find_all(structure, delim)
-        assert len(pos) % 2 == 0
+    for delimiter in other_delimiters:
+        pos = find_all(structure, delimiter)
 
         n = int(len(pos) / 2)
         i, j = pos[:n], pos[n:]
 
-        if n > 1:
-            assert all(np.diff(i) == 1)
-            assert all(np.diff(j) == 1)
-
         for ind in range(n):
             bps.append([i[ind], j[-1 - ind]])
 
-    left_delimiters = ["(", "{", "[", "<"]
-    right_delimiters = [")", "}", "]", ">"]
-
-    for left_delim, right_delim in list(zip(left_delimiters, right_delimiters, strict=False)):
-        left_list = []
+    for left_delimiter, right_delimiter in list(zip(LEFT_DELIMITERS, RIGHT_DELIMITERS, strict=True)):
+        left_indices = []
         for i, char in enumerate(structure):
-            if char == left_delim:
-                left_list.append(i)
-
-            elif char == right_delim:
-                bps.append([left_list[-1], i])
-                left_list = left_list[:-1]
-
-        assert len(left_list) == 0
+            if char == left_delimiter:
+                left_indices.append(i)
+            elif char == right_delimiter and left_indices:
+                bps.append([left_indices.pop(), i])
 
     return bps
 
 
-def parse_stems_from_bps(bps, debug=False):
-    # Creates list of stems, where each stem is a list of base pairs.
-    # i.e. '((.))' -> [[0,4],[1,3]]
-    # '((.)).((.))' -> [[[0,4],[1,3]],[[6,10],[7,9]]]
+def stems_from_pairs(pairs: list[list[int, int]]) -> list[list[list[int]]]:
+    """Extracts stems from a list of base pairs. A stem is a sequence of continuous base pairs.
 
-    if len(bps) == 0:
-        stems = []
-    else:
-        nres = np.max(bps)
-        stems = []
+    Args:
+        List of base pairs [i, j].
 
-        while len(bps) > 0:
-            bp = bps[0]
-            bps = bps[1:]
+    Returns:
+        List of stems, where each stem is a list of base pairs.
 
-            # Check outward
-            stem = [bp]
-            bp_next = copy(bp)
-            for _ in list(reversed(range(bp[0]))):
-                bp_next = [copy(bp_next)[0] - 1, copy(bp_next)[1] + 1]
+    Examples:
+        >>> stems_from_pairs(pairs_from_dotbracket("((.))"))  # [[0,4],[1,3]]
+        >>> stems_from_pairs(pairs_from_dotbracket('((.)).((.))'))  # [[[0,4],[1,3]],[[6,10],[7,9]]]
+    """
 
-                if len(bps) > 0:
-                    gp = find_all([x[0] for x in bps], [bp_next[0]])
-                    if len(gp) > 0:
-                        if bps[gp[0]][1] == bp_next[1]:  # found an extension
-                            stem.append(copy(bp_next))
-                            del bps[gp[0]]  # take out of bp list
-                    else:
-                        break
+    if len(pairs) == 0:
+        return []
 
-            # Check inward
-            bp_next = copy(bp)
-            for _ in range(bp[0], nres + 1):
-                bp_next[0] = copy(bp_next)[0] + 1
-                bp_next[1] = copy(bp_next)[1] - 1
+    # Find the maximum index value in pairs for boundary checks
+    nres = np.max(pairs)
+    stems = []
 
-                if not len(bps) > 0:
-                    continue
-                gp = find_all([x[0] for x in bps], [bp_next[0]])
+    while pairs:
+        bp = pairs.pop(0)  # Take the first base pair
+        stem = [bp]
 
-                if not len(gp) > 0:
-                    continue
+        # Check outward
+        bp_next = bp.copy()
+        while bp_next[0] > 0:
+            bp_next = [bp_next[0] - 1, bp_next[1] + 1]
+            matching_pairs = [p for p in pairs if p[0] == bp_next[0] and p[1] == bp_next[1]]
+            if matching_pairs:
+                stem.append(bp_next)
+                pairs.remove(matching_pairs[0])
+            else:
+                break
 
-                if bps[gp[0]][1] != bp_next[1]:
-                    break
+        # Check inward
+        bp_next = bp.copy()
+        while bp_next[0] < nres:
+            bp_next = [bp_next[0] + 1, bp_next[1] - 1]
+            matching_pairs = [p for p in pairs if p[0] == bp_next[0] and p[1] == bp_next[1]]
+            if matching_pairs:
+                stem.insert(0, bp_next)
+                pairs.remove(matching_pairs[0])
+            else:
+                break
 
-                # Found an extension
-                stem = [copy(bp_next)] + copy(stem)
-                del bps[gp[0]]  # take out of bp list
-            stems.append(stem)
+        stems.append(stem)
+
     return stems
 
 
-def parse_out_chainbreak(secstruct):
-    secstruct_new = []
-    is_chainbreak = []
+def get_stem_assignment(structure: str) -> np.ndarray:
+    """Returns an array indicating stem assignments for each bead in the structure.
 
-    chainbreak_ctr = 0
+    Args:
+        structure: Dot-bracket notation or a partner vector.
 
-    for _i, char in enumerate(secstruct):
-        if char in [",", "+", " ", "&"]:
-            is_chainbreak.append(chainbreak_ctr)
-        else:
-            secstruct_new.append(char)
-            chainbreak_ctr += 1
-    return is_chainbreak, "".join(secstruct_new)
+    Returns:
+        Array of stem assignments (1 to max(N_stems)), or 0 if not in a stem.
+    """
+    if structure[0].isdigit():
+        # Convert partner vector to base pairs
+        partner = [int(c) for c in structure]
+        pairs = [[i, p] for i, p in enumerate(partner) if p > i]
+    else:
+        pairs = pairs_from_dotbracket(structure)
 
-
-def get_stem_assignment(secstruct):
-    """Returns vector length N_beads, 0 if not in a stem, otherwise assigned stem 1 to max(N_stems)
-    Note basically not switched to zero-indexing for python version, unlike partner syntax"""
-
-    is_chainbreak, secstruct = parse_out_chainbreak(secstruct)
-
-    if not secstruct[0].isdigit():
-        bps = convert_structure_to_bps(secstruct)
-
-    else:  # assume partner vector was given
-        partner = secstruct
-        bps = []
-        for i in range(len(partner)):
-            if partner[i] > i:
-                bps.append([i, partner[i]])
-
-    stems = parse_stems_from_bps(bps)
-    stems = sorted(stems)
-    stem_assignment = np.zeros([len(secstruct)])
+    # Extract stems and create assignment array
+    stems = stems_from_pairs(pairs)
+    stem_assignment = np.zeros(len(structure), dtype=int)
 
     for i, stem in enumerate(stems):
+        stem_id = i + 1
         for bp in stem:
-            stem_assignment[bp[0]] = i + 1
-            stem_assignment[bp[1]] = i + 1
+            stem_assignment[bp[0]] = stem_id
+            stem_assignment[bp[1]] = stem_id
 
     return stem_assignment
 
 
-def get_pairmap(secstruct):
-    """
-    (lifted from draw_rna)
-    generates a list containing pair mappings
+def get_pairmap(structure: str) -> list[int]:
+    """Generates a list containing pair mappings, where each position in the list holds the index for it'text paired
+    base. If no pair exists, the value is -1.
 
-    args:
-    structure contains secondary structure string
+    Args:
+        Structure in dot-bracket notation.
 
-    returns:
-    list with pair mappings
+    Returns:
+        List with pair mappings.
+
+    Note:
+        Taken from draw_rna by Rhiju Das.
     """
+
     pair_stack = []
     end_stack = []
-    i_range = list(range(0, len(secstruct)))
-    pairs_array = [-1 for _ in i_range]  # -1 meaning no pair
+    pairs_array = [-1 for _ in range(len(structure))]  # -1 meaning no pair
 
-    left_delimiters = ["(", "{", "[", "<"]
-    right_delimiters = [")", "}", "]", ">"]
-
-    # assign pairs based on structure
-    for ii in i_range:
-        if secstruct[ii] in left_delimiters:
+    # Assign pairs based on structure
+    for ii in range(len(structure)):
+        if structure[ii] in LEFT_DELIMITERS:
             pair_stack.append(ii)
-        elif secstruct[ii] in right_delimiters:
+        elif structure[ii] in RIGHT_DELIMITERS:
             if not pair_stack:
                 end_stack.append(ii)
             else:
                 index = pair_stack.pop()
                 pairs_array[index] = ii
                 pairs_array[ii] = index
+
     if len(pair_stack) == len(end_stack):
         n = len(pair_stack)
         for ii in range(n):
             pairs_array[pair_stack[ii]] = end_stack[-ii]
             pairs_array[end_stack[-ii]] = pair_stack[ii]
-    else:
-        logger.error(f"Pairing incorrect: {secstruct}")
 
     return pairs_array
 
 
-def compose_structures(graphs, label_list=None):
-    if label_list is not None:
-        assert len(graphs) == len(label_list)
-    rg1 = graphs[0]
-    plot_nodes1 = [n for n in list(rg1.G.nodes) if isinstance(n, str)]
-    subgraph1 = rg1.G.subgraph(plot_nodes1)
-    new = nx.relabel.relabel_nodes(subgraph1, {k: f"1{k}" for k in subgraph1.nodes})
+def flip_helix(x, y, left_indices, right_indices):
+    """Reflects points over the center line between two groups.
 
-    for ind, rg2 in enumerate(graphs[1:]):
-        plot_nodes2 = [n for n in list(rg2.G.nodes) if isinstance(n, str)]
-        subgraph2 = rg2.G.subgraph(plot_nodes2)
-        new_sub2 = nx.relabel.relabel_nodes(subgraph2, {k: "%d%s" % (ind + 2, k) for k in subgraph2.nodes})
+    Args:
+        x: x-coordinates of points.
+        y: y-coordinates of points.
+        left_indices: Indices of points in the left group.
+        right_indices: Indices of points in the right group.
 
-        new = nx.compose(new, new_sub2)
+    Returns:
+        Updated x and y-coordinates of reflected points.
+    """
 
-    graph = new.to_undirected()
-    pos = graphviz_layout(graph, prog="neato")
-    [new[u][v]["color"] for u, v in new.edges()]
-    [new[u][v]["color"] for u, v in new.edges()]
-
-    ax = plt.gca()
-    for u, v in graph.edges():
-        x = [pos[u][0], pos[v][0]]
-        y = [pos[u][1], pos[v][1]]
-        line = Line2D(x, y, linewidth=2, solid_capstyle="round", color=graph[u][v]["color"])
-        ax.add_line(line)
-    ax.autoscale()
-
-    if label_list is not None:
-        for k in range(len(graphs)):
-            for x in pos:
-                if x.startswith("%d" % (k + 1)):
-                    ax.text(pos[x][0], pos[x][1], label_list[k])
-                    break
-    # colors = [new[u][v]['color'] for u,v in subgraph.edges()]
-    # nx.draw(new, pos, width=3, node_size=0, edge_color = colors, arrows=False, solid_capstyle='round')
-
-
-def flip_helix(x, y, left, right):
-    # get center line between 2 groups
-    # left - list of indices
-    # right - list of indices
     class1 = []
     class2 = []
     labels1 = []
     labels2 = []
-    for i in left:
+    for i in left_indices:
         class1.append(np.array([x[i], y[i]]))
         labels1.append(-1)
-    for i in right:
+    for i in right_indices:
         class2.append(np.array([x[i], y[i]]))
         labels1.append(1)
     class1 = np.array(class1)
     class2 = np.array(class2)
     x = np.vstack((class1, class2))
-    m = len(x)
-    x = np.array([np.ones(m), x[:, 0], x[:, 1]]).T
+    x = np.array([np.ones(len(x)), x[:, 0], x[:, 1]]).T
     y = np.concatenate((labels1, labels2)).T
     beta = np.linalg.inv(x.T @ x) @ (x.T @ y)
-    # 0 = b0 +b1x +b2y
 
-    # reflect all points over center line
-    for i in left + right:
+    # Reflect all points over center line
+    for i in left_indices + right_indices:
         temp = -2 * (beta[0] + beta[1] * x[i] + beta[2] * y[i]) / (beta[1] ** 2 + beta[2] ** 2)
         x[i] = temp * beta[1] + x[i]
         y[i] = temp * beta[2] + y[i]
     return x, y
 
 
-def move_group(x, y, offset, group):
-    # group - list of indices
-    # offset - [x,y] for movement
-    # move all items in the group
+def translate_group(x: list[float], y: list[float], offset: tuple[float, float], group: list[int]) -> tuple[
+    list[float], list[float]]:
+    """Moves points in `group` by the specified `offset`.
+
+    Args:
+        x: x-coordinates of points.
+        y: y-coordinates of points.
+        offset: (x, y) offset for movement.
+        group: Indices of points to move.
+
+    Returns:
+        tuple of list of float: Updated x and y-coordinates of points.
+    """
+
     for i in group:
         x[i] += offset[0]
         y[i] += offset[1]
     return x, y
 
 
-def rotate_group(x, y, angle, group):
-    # group - list of indices
-    # angle in degrees
+def rotate_group(x: list[float], y: list[float], angle: float, group: list[int]) -> tuple[list[float], list[float]]:
+    """Rotates points in `group` around their centroid by `angle` degrees.
+
+    Args:
+        x: x-coordinates of points.
+        y: y-coordinates of points.
+        angle: Rotation angle in degrees.
+        group: Indices of points to rotate.
+
+    Returns:
+        Updated x and y-coordinates of points.
+    """
     rotation = math.radians(angle)
     sum_x = 0
     sum_y = 0
