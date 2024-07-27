@@ -1,1 +1,1 @@
-from ribographviz.graph import RNAGraph as RNAGraph
+from ribographviz.graph import RNAGraph  # noqa: F401
