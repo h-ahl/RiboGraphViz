@@ -1,8 +1,8 @@
-sources = RNAGraph
+sources = ribographviz
 
 NAME:=hahl
 VERSION:=$(shell grep "current_version = " .bumpversion.toml | cut -d' ' -f3 | tr -d '"')
-GITHUB:=RNAGraph
+GITHUB:=RiboGraphViz
 
 
 .PHONY: test format lint unittest coverage pre-commit clean release

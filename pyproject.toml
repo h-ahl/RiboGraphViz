@@ -1,6 +1,6 @@
 [tool]
 [tool.poetry]
-name = "RNAGraph"
+name = "RiboGraphViz"
 version = "0.1.0"
 homepage = "https://github.com/h-ahl/RiboGraphViz"
 description = "RNAGraph: Visualize global properties of large RNAs using force-directed layout from GraphViz."
@@ -17,7 +17,7 @@ classifiers=[
     'Programming Language :: Python :: 3.12',
 ]
 packages = [
-    {include = "RNAGraph"},
+    {include = "ribographviz"},
     {include = "tests", format = "sdist"},
 ]
 include = []
