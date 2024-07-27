@@ -1,4 +1,4 @@
-# RiboGraphViz
+# A fork of RNAGraph
 
 Visualize global properties of large RNAs using force-directed layout from GraphViz.
 
@@ -19,9 +19,9 @@ sudo pip install -r requirements.txt
 sudo python setup.py install
 ```
 
-You'll need to use Python3; Python2 won't work. 
+You'll need to use Python3; Python2 won't work.
 
-*Tips for Mac users*: if you're stuck with Python 2, setting up a virtual environment (e.g., with `conda environment`) to install Python3 might be a good choice. You may also need to install `pygraphviz` -- which does not work with conda, but does work with `brew` and `pip install`, as noted [here](https://pygraphviz.github.io/documentation/stable/install.html). 
+*Tips for Mac users*: if you're stuck with Python 2, setting up a virtual environment (e.g., with `conda environment`) to install Python3 might be a good choice. You may also need to install `pygraphviz` -- which does not work with conda, but does work with `brew` and `pip install`, as noted [here](https://pygraphviz.github.io/documentation/stable/install.html).
 
 See `examples.ipynb` for example usage.
 
