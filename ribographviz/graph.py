@@ -5,7 +5,6 @@ import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
-from loguru import logger
 from matplotlib import cm
 from networkx.drawing.nx_agraph import graphviz_layout
 
@@ -14,6 +13,14 @@ from ribographviz.utils import LEFT_DELIMITERS, RIGHT_DELIMITERS
 
 
 class RNAGraph:
+    """TODO: """
+    structure: str
+    sequence: str | None = None
+    fiveprime_x = None
+    fiveprime_y = None
+    threeprime_x = None
+    threeprime_y = None
+
     def __init__(self, structure: str, sequence: str | None = None):
         """Create a directed graph representing an RNA secondary structure, where nodes represent hairpin loops,
         internal loops, bulges, anything not a helix, and stems represent helices.
@@ -23,28 +30,23 @@ class RNAGraph:
 
         Args:
             Secondary structure in dot-bracket notation. Currently cannot handle pseudoknots.
-
-        n_hairpins, n_internal_loops, n_multiloops: number of loops
-        n_helices : number of helices
-
-        loop_sizes (dictionary) : keys correspond to loop numbering (node numbering),
-         values hold the number of unpaired bases present in each loop.
         """
-
-        self.stems = sorted(utils.stems_from_pairs(utils.pairs_from_dotbracket(self.structure)))
-        self.stem_assignment = utils.get_stem_assignment(self.structure)
-        self.pairmap = utils.get_pairmap(self.structure)
 
         self.graph = nx.DiGraph()
         self.sequence = sequence
+        self.structure = structure
+
+        self.stems = sorted(utils.stems_from_pairs(utils.pairs_from_dotbracket(structure)))
+        self.stem_assignment = utils.get_stem_assignment(self.structure)
+        self.pairmap = utils.get_pairmap(self.structure)
+
         self.loop_sizes = {0: 0}
         self._n_bases = len(self.structure)
-        self.fiveprime_x, self.fiveprime_y, self.threeprime_x, self.threeprime_y = None, None, None, None
 
         self.create_graph()
 
-    def _process_pairmap(self):
-        """Process the pairmap. TODO: Figure out what this means."""
+    def _edges_from_pairmap(self):
+        """Process the pairmap to add the edges to the graph and get the loop sizes."""
         jj = 0
         while jj < len(self.pairmap):
             if self.pairmap[jj] > jj:  # in structure
@@ -54,7 +56,7 @@ class RNAGraph:
                 jj += 1
                 self.loop_sizes[0] += 1
 
-    def _prune_self_referencing_edges(self):
+    def _remove_self_referencing_edges(self):
         """Remove edges that point to the same node."""
         for nod in range(len(self.stem_assignment)):
             if (nod, nod) in self.graph.edges:
@@ -77,7 +79,10 @@ class RNAGraph:
                     raise ValueError(f"Unexpected character in structure: {self.structure[i - 1]}")
 
                 self.graph.add_edge(
-                    "n%d" % i, "h%d%s" % (self.stem_assignment[i - 1], letter), len=1.25, mld_weight=0
+                    f"n{i}",
+                    f"h{self.stem_assignment[i - 1]}{letter}",
+                    len=1.25,
+                    mld_weight=0
                 )
                 # TODO: add helix_a node here
 
@@ -90,9 +95,11 @@ class RNAGraph:
                     raise ValueError(f"Unexpected character in structure: {self.structure[i - 1]}")
 
                 self.graph.add_edge(
-                    "n%d" % i, "h%d%s" % (self.stem_assignment[i + 1], letter), len=1.25, mld_weight=0
+                    f"n{i}",
+                    f"h{self.stem_assignment[i + 1]}{letter}",
+                    len=1.25,
+                    mld_weight=0
                 )
-
                     # TODO: add helix_b node here
 
     def _process_nucleotide_nodes(self):
@@ -106,8 +113,8 @@ class RNAGraph:
     def create_graph(self):
         """Create graph by reading pairmap array and recursively creating edges."""
         self.graph.add_node(0)
-        self._process_pairmap()
-        self._prune_self_referencing_edges()
+        self._edges_from_pairmap()
+        self._remove_self_referencing_edges()
         self._process_helix_nodes()
         self._process_nucleotide_nodes()
 
@@ -412,7 +419,6 @@ class RNAGraph:
     def compute_structure_features(self):
         self.max_ladder_distance()
         self.n_hairpins, self.n_internal_loops, self.n_3WJs, self.n_4WJs, self.n_5WJs_up = self.count_loops()
-        self.struct_properties_ran = True
 
     def max_ladder_distance(self):
         """Computes the maximum ladder distance. This is defined as the end-to-end distance of helices present in
@@ -445,13 +451,3 @@ class RNAGraph:
         degree_counts[1] = max(0, degree_counts[1] - 1)
 
         return (degree_counts[1], degree_counts[2], degree_counts[3], degree_counts[4], degree_counts['more_than_4'])
-
-    def get_info(self):
-
-        self.compute_structure_features()
-        logger.info("Max ladder distance: %d" % self.max_ladder_distance)
-        logger.info("n_hairpins: %d" % self.n_hairpins)
-        logger.info("n_internal_loops: %d" % self.n_internal_loops)
-        logger.info("n_3WJs: %d" % self.n_3WJs)
-        logger.info("n_4WJs: %d" % self.n_4WJs)
-        logger.info("n_5WJs_up: %d" % self.n_5WJs_up)
