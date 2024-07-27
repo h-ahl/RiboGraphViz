@@ -5,10 +5,30 @@ import numpy as np
 from ribographviz.graph import RNAGraph
 
 
-def extract_stacks(sequence, structure, data=None, stack_size=0):
+def extract_stacks(sequence: str, structure: str, data: list | None = None, stack_size: int = 0):
+    """Extracts stack motifs from a given RNA secondary structure and sequence. Optionally, extracts associated
+    per-nucleotide data values if provided.
+
+    Args:
+        sequence: The RNA sequence.
+        structure: The RNA secondary structure in dot-bracket notation.
+        data: A list of per-nucleotide data values corresponding to the sequence.
+        stack_size: The size of the stacks to be extracted.
+
+    Returns:
+        - A list of stack motifs if `data` is None. Each motif is represented as a string in the
+              format 'SEQ1 SEQ2,... STR1 STR2,...', where SEQ1, SEQ2, ... are sequences of the stack segments
+              and STR1, STR2, ... are corresponding structural elements.
+
+        - A dictionary if `data` is provided. Keys are stack motifs in the format 'SEQ1 SEQ2,... STR1 STR2,...',
+              and values are lists of associated per-nucleotide data arrays.
+
+    Raises:
+        AssertionError: If the length of the sequence and structure do not match.
+    """
+
     assert len(sequence) == len(structure)
     mdl = RNAGraph(structure, sequence=sequence)
-
     struct = "(" * stack_size + " " + ")" * stack_size
 
     full_list_motifs = []
@@ -26,33 +46,43 @@ def extract_stacks(sequence, structure, data=None, stack_size=0):
                 dat_vec = [data[x] for x in side_1] + [-1] + [data[x] for x in side_2]
 
             seq_vec = "".join([mdl.sequence[x] for x in side_1] + [" "] + [mdl.sequence[x] for x in side_2])
-
             full_list_motifs.append(f"{seq_vec},{struct}")
 
             if data is not None:
                 full_list_data.append(np.array(dat_vec))
 
-    if data is not None:
-        returning_dct = {}
-
-        for i, k in enumerate(full_list_motifs):
-            if k in returning_dct:
-                returning_dct[k].append(full_list_data[i])
-            else:
-                returning_dct[k] = [full_list_data[i]]
-
-        return returning_dct
-    else:
+    if not data:
         return full_list_motifs
 
+    returning_dct = {}
+    for i, k in enumerate(full_list_motifs):
+        if k in returning_dct:
+            returning_dct[k].append(full_list_data[i])
+        else:
+            returning_dct[k] = [full_list_data[i]]
+    return returning_dct
 
-def extract_loops(sequence, structure, data=None, neighbor_bps=0):
-    """Given a sequence and structure, extract loops from the structure.
-    If a data vector is provided, also extracts and returns the data values.
+
+def extract_loops(sequence: str, structure: str, data: list | None = None, n_neighbors: int = 0):
+    """Extracts loop motifs from a given RNA secondary structure and sequence. Optionally, extracts associated
+    per-nucleotide data values if provided.
+
+    Args:
+        sequence: The RNA sequence.
+        structure: The RNA secondary structure in dot-bracket notation.
+        data: A list of per-nucleotide data values corresponding to the sequence.
+        n_neighbors: Number of neighboring base pairs to include around each loop motif.
 
     Returns:
-        - List of motifs in format 'UUA CU,... ..' = 3x2 internal loop, or
-        - a dictionary, where keys are motifs, and values are list of associated per-nucleotide data.
+        - A list of loop motifs if `data` is None. Each motif is represented as a string in the
+              format 'SEQ1 SEQ2,... STR1 STR2,...', where SEQ1, SEQ2, ... are sequences of the loop segments
+              and STR1, STR2, ... are corresponding structural elements.
+
+        - A dictionary if `data` is provided. Keys are loop motifs in the format 'SEQ1 SEQ2,... STR1 STR2,...',
+              and values are lists of associated per-nucleotide data arrays.
+
+    Raises:
+        AssertionError: If the length of the sequence and structure do not match.
     """
 
     assert len(sequence) == len(structure)
@@ -80,11 +110,11 @@ def extract_loops(sequence, structure, data=None, neighbor_bps=0):
 
             start_ind, end_ind = obj.start(), obj.end()
 
-            loop_motif.append(rg.structure[(start_ind - neighbor_bps + 1): (end_ind + neighbor_bps - 1)])
-            loop_seq.append(rg.sequence[(start_ind - neighbor_bps + 1) : (end_ind + neighbor_bps - 1)])
+            loop_motif.append(rg.structure[(start_ind - n_neighbors + 1): (end_ind + n_neighbors - 1)])
+            loop_seq.append(rg.sequence[(start_ind - n_neighbors + 1): (end_ind + n_neighbors - 1)])
 
             if data is not None:
-                loop_data.extend(data[(start_ind - neighbor_bps + 1) : (end_ind + neighbor_bps - 1)])
+                loop_data.extend(data[(start_ind - n_neighbors + 1): (end_ind + n_neighbors - 1)])
                 loop_data.extend([-1])
 
         motif = " ".join(loop_seq) + "," + " ".join(loop_motif)
