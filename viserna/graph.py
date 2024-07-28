@@ -17,23 +17,34 @@ IDENTICAL_CONSEQUTIVE_LEFT_DELIMITERS = [x + x for x in LEFT_DELIMITERS]
 IDENTICAL_CONSEQUTIVE_RIGHT_DELIMITERS = [x + x for x in RIGHT_DELIMITERS]
 
 class RNAGraph:
-    """TODO: """
+    """Represents an RNA secondary structure as a directed graph.
+
+    Attributes:
+        structure: RNA secondary structure in dot-bracket notation.
+        sequence: Optional RNA sequence.
+        fiveprime_coords_x: X-coordinate of the 5' end.
+        fiveprime_coords_y: Y-coordinate of the 5' end.
+        threeprime_coords_x: X-coordinate of the 3' end.
+        threeprime_coords_y: Y-coordinate of the 3' end.
+    """
+
     structure: str
     sequence: str | None = None
     fiveprime_coords_x: float | None = None
     fiveprime_coords_y: float | None = None
-    threeprime_coord_x: float | None = None
-    threeprime_coord_y: float | None = None
+    threeprime_coords_x: float | None = None
+    threeprime_coords_y: float | None = None
 
     def __init__(self, structure: str, sequence: str | None = None):
-        """Create a directed graph representing an RNA secondary structure, where nodes represent hairpin loops,
-        internal loops, bulges, anything not a helix, and _stems represent helices.
-
-        Edge weights (lengths) are equal to the number of base pairs present in the helix. Nodes are sized according to
-        the number of unpaired bases in the loop.
+        """Initializes a directed graph representing an RNA secondary structure.
 
         Args:
-            Secondary structure in dot-bracket notation. Currently cannot handle pseudoknots.
+            structure: RNA secondary structure in dot-bracket notation.
+            sequence: Optional RNA sequence.
+
+        Note:
+            Nodes represent non-helix elements (hairpin loops, internal loops, etc.), and edges represent helices with
+            weights corresponding to base pairs.
         """
 
         self.graph = nx.DiGraph()
@@ -64,6 +75,11 @@ class RNAGraph:
 
 
     def _process_helix_nodes(self):
+        """Processes helix nodes in the graph, adding edges between nucleotide nodes and adjacent helix nodes.
+
+        Adds edges based on the stem assignments and updates the graph with helix connections.
+        """
+
         stem_assignment_left = np.concatenate([np.array([-1]), self._stem_assignment[:-1]])
         stem_assignment_right = np.concatenate([self._stem_assignment[1:], np.array([-1])])
         for i, pair in enumerate(self._pairmap):
@@ -81,7 +97,11 @@ class RNAGraph:
             # TODO: add helix node a and b
 
     def _process_nucleotide_nodes(self):
-        """TODO: """
+        """Processes nucleotide nodes in the graph and adds edges between consecutive nodes.
+
+        Edges are added between nodes "n{i-1}" and "n{i}" if both exist.
+        """
+
         nucleotide_nodes = [n for n in list(self.graph.nodes) if isinstance(n, str) and n.startswith("n")]  # hacky
         for nuc in nucleotide_nodes:
             ind = int(nuc.replace("n", ""))
@@ -89,7 +109,15 @@ class RNAGraph:
                 self.graph.add_edge("n%d" % (ind - 1), "n%d" % ind, len=1, mld_weight=0)
 
     def create_graph(self):
-        """Create graph by reading _pairmap array and recursively creating edges."""
+        """Creates a graph by reading the _pairmap array and recursively creating edges. Performs the following steps:
+            - Initializes the graph with a starting node.
+            - Reads the _pairmap array to add edges.
+            - Removes self-referencing edges.
+            - Processes helix and nucleotide nodes.
+            - Adds edges between helix nodes based on stem length.
+            - Adds edges between structure segments based on delimiters.
+        """
+
         self.graph.add_node(0)
         self._edges_from_pairmap()
         self._remove_self_referencing_edges()
@@ -124,7 +152,17 @@ class RNAGraph:
                 self.graph.add_edge(f"h{stem_ind_1}b", f"h{stem_ind_2}a", len=1, weight=1, mld_weight=0)
 
     def add_edges(self, start_index, end_index, last_helix, last_loop):
-        """Recursive method to add edges to graph."""
+        """Recursively adds edges to the graph based on the pairing map.
+
+        Args:
+            start_index: Starting index of the sequence.
+            end_index: Ending index of the sequence.
+            last_helix: Last helix index used in the graph.
+            last_loop: Last loop index used in the graph.
+
+        Raises:
+            ValueError: If start_index is greater than end_index.
+        """
 
         if start_index > end_index:
             raise ValueError("start_index > end_index")
@@ -156,6 +194,12 @@ class RNAGraph:
                     jj += 1
 
     def _update_flank_coordinates(self, node_positions_x, node_positions_y):
+        """Updates the coordinates of the 5' and 3' flanking coordinates.
+
+        Args:
+            node_positions_x: Dictionary of x coordinates of nodes.
+            node_positions_y: Dictionary of y coordinates of nodes.
+        """
         if self.threeprime_coords_x is not None:
             self.threeprime_coords_x = self.threeprime_coords_x - node_positions_x[0]
             self.threeprime_coords_y = self.threeprime_coords_y - node_positions_y[0]
@@ -164,10 +208,21 @@ class RNAGraph:
             self.fiveprime_coords_x = self.fiveprime_coords_x - node_positions_x[0]
             self.fiveprime_coords_y = self.fiveprime_coords_y - node_positions_y[0]
 
-    def _update_stem_coordinates(self, node_positions_x, node_positions_y, pos, bond_width):
+    def _update_stem_coordinates(self, node_positions_x, node_positions_y, positions, bond_width):
+        """Updates the coordinates of stem nodes based on their positions and bond width.
+
+        Args:
+            node_positions_x: Dictionary of x coordinates of nodes.
+            node_positions_y: Dictionary of y coordinates of nodes.
+            positions: Dictionary of initial node positions.
+            bond_width: Bond width used for calculating positions.
+
+        Returns:
+            Updated dictionaries of x and y coordinates of nodes.
+        """
         for i, stem in enumerate(self._stems):
-            start_x, start_y = pos["h%da" % (i + 1)]
-            fin_x, fin_y = pos["h%db" % (i + 1)]
+            start_x, start_y = positions[f"h{i + 1}a"]
+            fin_x, fin_y = positions[f"h{i + 1}b"]
 
             x_dist = fin_x - start_x
             y_dist = fin_y - start_y
@@ -196,7 +251,19 @@ class RNAGraph:
                     node_positions_y[stem[j][1]] = y_midpoint - y_diff
         return node_positions_x, node_positions_y
 
-    def _configure_positions(self, subgraph):
+    def _configure_positions(self, subgraph: nx.Graph):
+        """Configures positions of nodes in the subgraph using Graphviz layout.
+
+        Args:
+            subgraph: Subgraph for which to configure positions.
+
+        Returns:
+            Tuple containing:
+                - graph_positions: Dictionary of node positions.
+                - bond_width: Computed bond width between nodes.
+                - node_positions_x: Dictionary of x coordinates of nodes.
+                - node_positions_y: Dictionary of y coordinates of nodes.
+        """
         graph_positions = graphviz_layout(subgraph, prog="neato")
 
         # If single-molecule, get the 5 and 3' end coordinates
@@ -221,7 +288,16 @@ class RNAGraph:
 
         return graph_positions, bond_width, node_positions_x, node_positions_y
 
-    def _add_flank_nodes(self, subgraph):
+    def _add_flank_nodes(self, subgraph: nx.Graph):
+        """Adds nodes for the 5' and 3' ends to the subgraph.
+
+        Args:
+            subgraph: Subgraph to which the flank nodes are added.
+
+        Returns:
+            Modified subgraph with added flank nodes.
+        """
+
         # 5' end
         if "n0" in list(subgraph.nodes()):
             subgraph.add_edge("n0", "5'", len=2)
@@ -235,8 +311,10 @@ class RNAGraph:
         return subgraph
 
     def get_coordinates(self):
-        """
-        Return: array of x_coords, array of y_coords
+        """Calculates and returns the x and y coordinates of nodes in the graph.
+
+        Returns:
+            Tuple of arrays: (x_coords, y_coords).
         """
         plot_nodes = [n for n in list(self.graph.nodes) if isinstance(n, str)]
         subgraph = self.graph.subgraph(plot_nodes).to_undirected()
@@ -268,6 +346,18 @@ class RNAGraph:
 
     def _get_colors(self, c: list[float | str] | str | None, vmin: float | None = None, vmax: float | None = None,
                     cmap: str = "plasma"):
+        """Processes the input to generate a list of colors.
+
+        Args:
+            c: List of floats or strings, string, or None.
+            vmin: Minimum value for normalization.
+            vmax: Maximum value for normalization.
+            cmap: Colormap.
+
+        Returns:
+            List of colors.
+        """
+
         # TODO: Add color modes
         if c is None:
             return ["k"] * self._n_bases
@@ -289,13 +379,24 @@ class RNAGraph:
 
         return colors
 
-    def _get_alpha(self, alpha):
+    def _get_alpha(self, alpha: float | list[float] | None) -> list[float]:
+        """Processes the input alpha to ensure it is a list of appropriate length.
+
+        Args:
+            alpha: A float, list of floats, or None.
+
+        Returns:
+            List of floats.
+
+        Raises:
+            TypeError: If alpha is not a float, list of floats, or None.
+        """
         if alpha is None:
             return [1] * self._n_bases
 
         if isinstance(alpha, float):
             alpha = [alpha] * self._n_bases
-        elif isinstance(alpha, list):
+        elif isinstance(alpha, list[float]):
             assert len(alpha) == self._n_bases
         else:
             raise TypeError("Invalid alpha type. Must be float, list of floats or None.")
