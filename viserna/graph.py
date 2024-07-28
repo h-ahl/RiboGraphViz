@@ -12,6 +12,9 @@ from networkx.drawing.nx_agraph import graphviz_layout
 from viserna import utils
 from viserna.utils import LEFT_DELIMITERS, RIGHT_DELIMITERS, get_strand_id
 
+ALL_POSSIBLE_CONSEQUTIVE_DELIMITERS = [x[0] + x[1] for x in list(itertools.product(RIGHT_DELIMITERS, LEFT_DELIMITERS))]
+IDENTICAL_CONSEQUTIVE_LEFT_DELIMITERS = [x + x for x in LEFT_DELIMITERS]
+IDENTICAL_CONSEQUTIVE_RIGHT_DELIMITERS = [x + x for x in RIGHT_DELIMITERS]
 
 class RNAGraph:
     """TODO: """
@@ -110,21 +113,17 @@ class RNAGraph:
                     (self._stem_assignment[i + 1] != 0.0 and self._stem_assignment[i] != 0.0)):
                 continue
 
-            left_left_same = [x + x for x in LEFT_DELIMITERS]
-            right_left = [x[0] + x[1] for x in list(itertools.product(RIGHT_DELIMITERS, LEFT_DELIMITERS))]
-            right_right_same = [x + x for x in RIGHT_DELIMITERS]
-
+            # Add edges based on the structure segment
             stem_ind_1 = self._stem_assignment[i]
             stem_ind_2 = self._stem_assignment[i + 1]
-            if self.structure[i: i + 2] in left_left_same:
-                self.graph.add_edge(f"h{stem_ind_1}a", f"h{stem_ind_2}b", len=1, weight=1,
-                                    mld_weight=0)
-            elif self.structure[i : i + 2] in right_left:
-                self.graph.add_edge(f"h{stem_ind_1}b", f"h{stem_ind_2}b", len=1, weight=1,
-                                    mld_weight=0)
-            elif self.structure[i : i + 2] in right_right_same:
-                self.graph.add_edge(f"h{stem_ind_1}b", f"h{stem_ind_2}a", len=1, weight=1,
-                                    mld_weight=0)
+            structure_segment = self.structure[i: i + 2]
+
+            if structure_segment in IDENTICAL_CONSEQUTIVE_LEFT_DELIMITERS:
+                self.graph.add_edge(f"h{stem_ind_1}a", f"h{stem_ind_2}b", len=1, weight=1, mld_weight=0)
+            elif structure_segment in ALL_POSSIBLE_CONSEQUTIVE_DELIMITERS:
+                self.graph.add_edge(f"h{stem_ind_1}b", f"h{stem_ind_2}b", len=1, weight=1, mld_weight=0)
+            elif structure_segment in IDENTICAL_CONSEQUTIVE_RIGHT_DELIMITERS:
+                self.graph.add_edge(f"h{stem_ind_1}b", f"h{stem_ind_2}a", len=1, weight=1, mld_weight=0)
 
     def add_edges(self, start_index, end_index, last_helix, last_loop):
         """Recursive method to add edges to graph."""
