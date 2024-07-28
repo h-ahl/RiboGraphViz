@@ -156,13 +156,13 @@ class RNAGraph:
                     jj += 1
 
     def _update_flank_coordinates(self, node_positions_x, node_positions_y):
-        if self.threeprime_x is not None:
-            self.threeprime_x = self.threeprime_x - node_positions_x[0]
-            self.threeprime_y = self.threeprime_y - node_positions_y[0]
+        if self.threeprime_coords_x is not None:
+            self.threeprime_coords_x = self.threeprime_coords_x - node_positions_x[0]
+            self.threeprime_coords_y = self.threeprime_coords_y - node_positions_y[0]
 
-        if self.fiveprime_x is not None:
-            self.fiveprime_x = self.fiveprime_x - node_positions_x[0]
-            self.fiveprime_y = self.fiveprime_y - node_positions_y[0]
+        if self.fiveprime_coords_x is not None:
+            self.fiveprime_coords_x = self.fiveprime_coords_x - node_positions_x[0]
+            self.fiveprime_coords_y = self.fiveprime_coords_y - node_positions_y[0]
 
     def _update_stem_coordinates(self, node_positions_x, node_positions_y, pos, bond_width):
         for i, stem in enumerate(self._stems):
@@ -200,9 +200,9 @@ class RNAGraph:
         graph_positions = graphviz_layout(subgraph, prog="neato")
 
         # If single-molecule, get the 5 and 3' end coordinates
-        self.fiveprime_x, self.fiveprime_y = graph_positions["5'"]
+        self.fiveprime_coords_x, self.fiveprime_coords_y = graph_positions["5'"]
         if "3'" in list(subgraph.nodes()):
-            self.threeprime_x, self.threeprime_y = graph_positions["3'"]
+            self.threeprime_coords_x, self.threeprime_coords_y = graph_positions["3'"]
 
         # Compute the bond width
         for u, v in list(subgraph.edges()):
@@ -256,13 +256,13 @@ class RNAGraph:
         node_pos_list_x /= bond_width
         node_pos_list_y /= bond_width
 
-        if self.threeprime_x is not None:
-            self.threeprime_x /= bond_width
-            self.threeprime_y /= bond_width
+        if self.threeprime_coords_x is not None:
+            self.threeprime_coords_x /= bond_width
+            self.threeprime_coords_y /= bond_width
 
-        if self.fiveprime_x is not None:
-            self.fiveprime_x /= bond_width
-            self.fiveprime_y /= bond_width
+        if self.fiveprime_coords_x is not None:
+            self.fiveprime_coords_x /= bond_width
+            self.fiveprime_coords_y /= bond_width
 
         return node_pos_list_x, node_pos_list_y
 
@@ -370,11 +370,11 @@ class RNAGraph:
                 )
 
         if show_ends:
-            if self.fiveprime_x and self.fiveprime_y:
-                plt.text(self.fiveprime_x + nt_labels_offset[0], self.fiveprime_y + nt_labels_offset[1],
+            if self.fiveprime_coords_x and self.fiveprime_coords_y:
+                plt.text(self.fiveprime_coords_x + nt_labels_offset[0], self.fiveprime_coords_y + nt_labels_offset[1],
                          five_prime_label, fontsize=fontsize)
-            if self.threeprime_x and self.threeprime_y:
-                plt.text(self.threeprime_x + nt_labels_offset[0], self.threeprime_y + nt_labels_offset[1],
+            if self.threeprime_coords_x and self.threeprime_coords_y:
+                plt.text(self.threeprime_coords_x + nt_labels_offset[0], self.threeprime_coords_y + nt_labels_offset[1],
                          three_prime_label, fontsize=fontsize)
 
         ax.axis("off")
