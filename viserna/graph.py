@@ -61,16 +61,6 @@ class RNAGraph:
         self.graph.remove_edges_from(
             (nod, nod) for nod in range(len(self._stem_assignment)) if (nod, nod) in self.graph.edges)
 
-    def _add_edge_if_assigned_stem(self, index, offset, stem_assignment):
-        if stem_assignment[index] <= 0:
-            return
-        strand_id = get_strand_id(self.structure[index + offset])
-        self.graph.add_edge(
-            f"n{index}",
-            f"h{self._stem_assignment[index + offset]}{strand_id}",
-            len=1.25,
-            mld_weight=0
-        )
 
     def _process_helix_nodes(self):
         stem_assignment_left = np.concatenate([np.array([-1]), self._stem_assignment[:-1]])
@@ -81,21 +71,12 @@ class RNAGraph:
 
             self.graph.add_node(f"n{i}")
             if stem_assignment_left[i] > 0:
-                if self.structure[i - 1] in LEFT_DELIMITERS:
-                    letter = 'a'
-                elif self.structure[i - 1] in RIGHT_DELIMITERS:
-                    letter = 'b'
-                self.graph.add_edge('n%d' % i, 'h%d%s' % (self._stem_assignment[i - 1], letter), len=1.25, mld_weight=0)
+                strand_id = get_strand_id(self.structure[i - 1])
+                self.graph.add_edge(f'n{i}', f'h{self._stem_assignment[i - 1]}{strand_id}', len=1.25, mld_weight=0)
 
             if stem_assignment_right[i] > 0:
-                if self.structure[i + 1] in RIGHT_DELIMITERS:
-                    letter = 'a'
-                elif self.structure[i + 1] in LEFT_DELIMITERS:
-                    letter = 'b'
-                self.graph.add_edge('n%d' % i, 'h%d%s' % (self._stem_assignment[i + 1], letter), len=1.25,
-                                mld_weight=0)
-            # self._add_edge_if_assigned_stem(i, -1, stem_assignment_left)
-            # self._add_edge_if_assigned_stem(i, 1, stem_assignment_right)
+                strand_id = get_strand_id(self.structure[i + 1])
+                self.graph.add_edge(f'n{i}', f'h{self._stem_assignment[i + 1]}{strand_id}', len=1.25, mld_weight=0)
             # TODO: add helix node a and b
 
     def _process_nucleotide_nodes(self):
@@ -268,8 +249,7 @@ class RNAGraph:
         Return: array of x_coords, array of y_coords
         """
         plot_nodes = [n for n in list(self.graph.nodes) if isinstance(n, str)]
-        subgraph = self.graph.subgraph(plot_nodes)
-        subgraph = subgraph.to_undirected()
+        subgraph = self.graph.subgraph(plot_nodes).to_undirected()
 
         # Add nodes specifically for the 5' and 3' ends
         subgraph = self._add_flank_nodes(subgraph)
