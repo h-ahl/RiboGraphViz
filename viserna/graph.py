@@ -20,10 +20,10 @@ class RNAGraph:
     """TODO: """
     structure: str
     sequence: str | None = None
-    fiveprime_x: float | None = None
-    fiveprime_y: float | None = None
-    threeprime_x: float | None = None
-    threeprime_y: float | None = None
+    fiveprime_coords_x: float | None = None
+    fiveprime_coords_y: float | None = None
+    threeprime_coord_x: float | None = None
+    threeprime_coord_y: float | None = None
 
     def __init__(self, structure: str, sequence: str | None = None):
         """Create a directed graph representing an RNA secondary structure, where nodes represent hairpin loops,
@@ -43,7 +43,6 @@ class RNAGraph:
         self._stems = sorted(utils.stems_from_pairs(utils.pairs_from_dotbracket(structure)))
         self._stem_assignment = utils.get_stem_assignment(self.structure)
         self._pairmap = utils.get_pairmap(self.structure)
-        self._loop_sizes = {0: 0}
         self._n_bases = len(self.structure)
 
         self.create_graph()
@@ -57,7 +56,6 @@ class RNAGraph:
                 jj = self._pairmap[jj] + 1
             else:  # external loop
                 jj += 1
-                self._loop_sizes[0] += 1
 
     def _remove_self_referencing_edges(self):
         """Remove edges that point to the same node."""
@@ -154,14 +152,7 @@ class RNAGraph:
                             weight=len(self._stems[int(last_helix - 1)]),
                             mld_weight=0,
                         )
-
                         last_loop = copy(last_helix)
-
-                    if int(last_helix) not in self._loop_sizes:
-                        self._loop_sizes[int(last_helix)] = 0
-
-                    self._loop_sizes[int(last_helix)] += 1
-
                     jj += 1
 
     def _update_flank_coordinates(self, node_positions_x, node_positions_y):
@@ -346,6 +337,7 @@ class RNAGraph:
 
         Returns:
             Matplotlib Axes object if `ax` is set. Otherwise, plots the structure in the current axis and returns None.
+
         """
         if isinstance(nt_labels_offset, float):
             nt_labels_offset = [nt_labels_offset, nt_labels_offset]
