@@ -5,8 +5,15 @@ from viserna import RNAGraph
 
 
 def compute_max_ladder_distance(rna_graph: RNAGraph) -> float:
-    """Computes the maximum ladder distance. This is defined as the end-to-end distance of helices present in
-    structure, not counting lengths of loops."""
+    """Computes the maximum ladder distance, defined as the end-to-end distance of helices, excluding loop lengths.
+
+    Args:
+        rna_graph: An instance of RNAGraph.
+
+    Returns:
+        The maximum ladder distance.
+    """
+
     nodes = list(rna_graph.graph.nodes)
     subgraph = rna_graph.graph.subgraph(nodes).to_undirected()
 
@@ -22,6 +29,15 @@ def compute_max_ladder_distance(rna_graph: RNAGraph) -> float:
 
 
 def count_loops(rna_graph: RNAGraph) -> tuple[int, int, int, int, int]:
+    """Counts the number of loops in the RNA graph based on their degrees.
+
+    Args:
+        rna_graph: An instance of RNAGraph.
+
+    Returns:
+        A tuple with counts of loops by degree: (degree_1, degree_2, degree_3, degree_4, more_than_4).
+    """
+
     degree_counts = {1: 0, 2: 0, 3: 0, 4: 0, 'more_than_4': 0}
     nodes = [n for n in rna_graph.graph.nodes if not isinstance(n, str)]
     subgraph = rna_graph.graph.subgraph(nodes).to_undirected()
