@@ -8,8 +8,8 @@ import numpy as np
 from matplotlib import cm
 from networkx.drawing.nx_agraph import graphviz_layout
 
-from ribographviz import utils
-from ribographviz.utils import LEFT_DELIMITERS, RIGHT_DELIMITERS
+from viserna import utils
+from viserna.utils import LEFT_DELIMITERS, RIGHT_DELIMITERS, get_strand_id
 
 
 class RNAGraph:
@@ -57,9 +57,19 @@ class RNAGraph:
 
     def _remove_self_referencing_edges(self):
         """Remove edges that point to the same node."""
-        for nod in range(len(self._stem_assignment)):
-            if (nod, nod) in self.graph.edges:
-                self.graph.remove_edge(nod, nod)
+        self.graph.remove_edges_from(
+            (nod, nod) for nod in range(len(self._stem_assignment)) if (nod, nod) in self.graph.edges)
+
+    def _add_edge_if_assigned_stem(self, index, offset, stem_assignment):
+        if stem_assignment[index] <= 0:
+            return
+        strand_id = get_strand_id(self.structure[index + offset])
+        self.graph.add_edge(
+            f"n{index}",
+            f"h{self._stem_assignment[index + offset]}{strand_id}",
+            len=1.25,
+            mld_weight=0
+        )
 
     def _process_helix_nodes(self):
         stem_assignment_left = np.concatenate([np.array([-1]), self._stem_assignment[:-1]])
@@ -69,37 +79,9 @@ class RNAGraph:
                 continue
 
             self.graph.add_node("n%d" % i)
-            if stem_assignment_left[i] > 0:
-                if self.structure[i - 1] in LEFT_DELIMITERS:
-                    letter = "a"
-                elif self.structure[i - 1] in RIGHT_DELIMITERS:
-                    letter = "b"
-                else:
-                    raise ValueError(f"Unexpected character in structure: {self.structure[i - 1]}")
-
-                self.graph.add_edge(
-                    f"n{i}",
-                    f"h{self._stem_assignment[i - 1]}{letter}",
-                    len=1.25,
-                    mld_weight=0
-                )
-                # TODO: add helix_a node here
-
-            if stem_assignment_right[i] > 0:
-                if self.structure[i + 1] in RIGHT_DELIMITERS:
-                    letter = "a"
-                elif self.structure[i + 1] in LEFT_DELIMITERS:
-                    letter = "b"
-                else:
-                    raise ValueError(f"Unexpected character in structure: {self.structure[i - 1]}")
-
-                self.graph.add_edge(
-                    f"n{i}",
-                    f"h{self._stem_assignment[i + 1]}{letter}",
-                    len=1.25,
-                    mld_weight=0
-                )
-                    # TODO: add helix_b node here
+            self._add_edge_if_assigned_stem(i, -1, stem_assignment_left)
+            self._add_edge_if_assigned_stem(i, 1, stem_assignment_right)
+            # TODO: add helix node a and b
 
     def _process_nucleotide_nodes(self):
         """TODO: """

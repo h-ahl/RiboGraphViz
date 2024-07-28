@@ -2,7 +2,7 @@ import re
 
 import numpy as np
 
-from ribographviz.graph import RNAGraph
+from viserna.graph import RNAGraph
 
 
 def extract_stacks(sequence: str, structure: str, data: list | None = None, stack_size: int = 0):

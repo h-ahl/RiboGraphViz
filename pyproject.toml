@@ -1,6 +1,6 @@
 [tool]
 [tool.poetry]
-name = "RiboGraphViz"
+name = "ribographviz"
 version = "0.1.0"
 homepage = "https://github.com/h-ahl/RiboGraphViz"
 description = "RNAGraph: Visualize global properties of large RNAs using force-directed layout from GraphViz."
@@ -40,6 +40,7 @@ ruff = "^0.5.3"
 bump-my-version = "^0.24.3"
 networkx = "^3.3"
 matplotlib = "^3.9.1"
+graphviz = "^0.20.3"
 
 [tool.poetry.group.dev.dependencies]
 ipython = "^8.26.0"

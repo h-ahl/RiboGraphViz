@@ -1,7 +1,7 @@
 
 import networkx as nx
 
-from ribographviz import RNAGraph
+from viserna import RNAGraph
 
 
 def compute_max_ladder_distance(rna_graph: RNAGraph) -> float:
