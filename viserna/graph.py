@@ -78,9 +78,23 @@ class RNAGraph:
             if pair != -1:
                 continue
 
-            self.graph.add_node("n%d" % i)
-            self._add_edge_if_assigned_stem(i, -1, stem_assignment_left)
-            self._add_edge_if_assigned_stem(i, 1, stem_assignment_right)
+            self.graph.add_node(f"n{i}")
+            if stem_assignment_left[i] > 0:
+                if self.structure[i - 1] in LEFT_DELIMITERS:
+                    letter = 'a'
+                elif self.structure[i - 1] in RIGHT_DELIMITERS:
+                    letter = 'b'
+                self.graph.add_edge('n%d' % i, 'h%d%s' % (self._stem_assignment[i - 1], letter), len=1.25, mld_weight=0)
+
+            if stem_assignment_right[i] > 0:
+                if self.structure[i + 1] in RIGHT_DELIMITERS:
+                    letter = 'a'
+                elif self.structure[i + 1] in LEFT_DELIMITERS:
+                    letter = 'b'
+                self.graph.add_edge('n%d' % i, 'h%d%s' % (self._stem_assignment[i + 1], letter), len=1.25,
+                                mld_weight=0)
+            # self._add_edge_if_assigned_stem(i, -1, stem_assignment_left)
+            # self._add_edge_if_assigned_stem(i, 1, stem_assignment_right)
             # TODO: add helix node a and b
 
     def _process_nucleotide_nodes(self):
