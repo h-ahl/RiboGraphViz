@@ -1,4 +1,5 @@
 import itertools
+from collections.abc import Collection
 from copy import copy
 
 import matplotlib.colors as mcolors
@@ -295,42 +296,11 @@ class RNAGraph:
 
         return node_pos_list_x, node_pos_list_y
 
-    def draw(
-        self,
-        label=None,
-        struct_label=None,
-        x0=0,
-        y0=0,
-        c=None,
-        cmap="plasma",
-        alpha=None,
-        ax=None,
-        vmin=None,
-        vmax=None,
-        fontsize=12,
-    ):
-        """Draw structure using GraphViz layout.
-
-        Input: RNAGraph object or list of objects.
-
-        label (str): list of labels for nucleotides.
-        c: color. Can be single matplotlib color letter, string of matplotlib color letters,
-                        or list-like object of values (to be used with cmap).
-        alpha: Transparency value. can be single value or vector.
-
-        ax: axis object to use for drawing.
-        figsize: figure size.
-        fontsize (int): fontsize for labels.
-
-        Returns: ax object.
-        """
-        if struct_label is not None:
-            raise RuntimeError("struct_label present and not multiple structures.")
-
-        x_coords, y_coords = self.get_coordinates()
-
-        ax = ax or plt.gca()
-        ax.set_aspect("equal")
+    def _get_colors(self, c: list[float | str] | str | None, vmin: float | None = None, vmax: float | None = None,
+                    cmap: str = "plasma"):
+        # TODO: Add color modes
+        if c is None:
+            return ["k"] * self._n_bases
 
         if isinstance(c, str):
             if len(c) == 1:
@@ -338,51 +308,103 @@ class RNAGraph:
             else:
                 assert len(c) == self._n_bases
                 colors = c
-
-        elif c is None:
-            colors = ["k"] * self._n_bases
-
         else:
             assert len(c) == self._n_bases
             colormap = plt.get_cmap(cmap)
-            if vmin is None:
-                vmin = np.min(c)
-            if vmax is None:
-                vmax = np.max(c)
-            color_norm = mcolors.Normalize(vmin=vmin, vmax=vmax)  # 3 for reac
+            vmin = vmin or np.min(c)
+            vmax = vmax or np.max(c)
+            color_norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
             scalar_map = cm.ScalarMappable(norm=color_norm, cmap=colormap)
             colors = [scalar_map.to_rgba(val) for val in c]
 
-        ax.set_xlim([np.min(x_coords) - 5 + x0, np.max(x_coords) + 5 + x0])
-        ax.set_ylim([np.min(y_coords) - 5 + y0, np.max(y_coords) + 5 + y0])
+        return colors
 
+    def _get_alpha(self, alpha):
         if alpha is None:
-            alpha = [1] * self._n_bases
-        elif isinstance(alpha, float):
+            return [1] * self._n_bases
+
+        if isinstance(alpha, float):
             alpha = [alpha] * self._n_bases
         elif isinstance(alpha, list):
             assert len(alpha) == self._n_bases
+        else:
+            raise TypeError("Invalid alpha type. Must be float, list of floats or None.")
+        return alpha
 
+    def draw(
+        self,
+        c: str | Collection[str, ...] = None,
+        cmap: str = "plasma",  # TODO: parse cmap
+        alpha: float | Collection[float, ...] | None = None,
+        vmin: float | None = None,
+        vmax: float | None = None,
+        nt_labels: Collection[str, ...] = None,
+        nt_labels_offset: float | Collection[float, float] = 0.0,
+        show_ends: bool = True,
+        five_prime_label: str = "5'",
+        three_prime_label: str = "3'",
+        fontsize: float = 12,
+        ax: plt.Axes | None = None,
+        pad: int = 5
+    ) -> plt.Axes | None:
+        """Draws the structure using a GraphViz layout.
+
+        Args:
+            c: Color specification, which can be a single color, a collection of colors, or a list-like object of
+                values to be used with `cmap`.
+            nt_labels: Collection of nucleotide labels.
+            nt_labels_offset: Offset for labels, either a float or a collection of two floats.
+            cmap: Colormap to use for coloring.
+            alpha: Transparency value, either a single float or a collection of floats.
+            vmin: Minimum data value for colormap scaling.
+            vmax: Maximum data value for colormap scaling.
+            ax: Matplotlib Axes object to use for drawing. If None, a new Axes object is created.
+            fontsize: Font size for labels.
+            show_ends: Whether to show labels for the 5' and 3' ends.
+            five_prime_label: Label for the 5' end.
+            three_prime_label: Label for the 3' end.
+            pad: Padding for the margins.
+
+        Returns:
+            Matplotlib Axes object if `ax` is set. Otherwise, plots the structure in the current axis and returns None.
+        """
+        if isinstance(nt_labels_offset, float):
+            nt_labels_offset = [nt_labels_offset, nt_labels_offset]
+
+        x_coords, y_coords = self.get_coordinates()
+
+        ax = ax or plt.gca()
+        ax.set_aspect("equal")
+        ax.set_xlim([np.min(x_coords) - pad + nt_labels_offset[0], np.max(x_coords) + pad + nt_labels_offset[0]])
+        ax.set_ylim([np.min(y_coords) - pad + nt_labels_offset[1], np.max(y_coords) + pad + nt_labels_offset[1]])
+
+        colors = self._get_colors(c, cmap, vmin, vmax)
+        alpha = self._get_alpha(alpha)
+
+        # Plot nucleotides
         for i in range(self._n_bases):
             circ = plt.Circle(
-                (x_coords[i] + x0, y_coords[i] + y0), radius=1 / 2, color=colors[i], alpha=alpha[i], linewidth=0
+                (x_coords[i] + nt_labels_offset[0], y_coords[i] + nt_labels_offset[1]), radius=1 / 2, color=colors[i],
+                alpha=alpha[i], linewidth=0
             )
             ax.add_artist(circ)
-            if label:
+            if nt_labels:
                 plt.text(
-                    x_coords[i] + x0,
-                    y_coords[i] + y0,
-                    label[i],
+                    x_coords[i] + nt_labels_offset[0],
+                    y_coords[i] + nt_labels_offset[1],
+                    nt_labels[i],
                     horizontalalignment="center",
                     verticalalignment="center",
                     fontsize=fontsize,
                 )
 
-        if self.fiveprime_x is not None:
-            plt.text(self.fiveprime_x + x0, self.fiveprime_y + y0, "5'")
-
-        if self.threeprime_x is not None:
-            plt.text(self.threeprime_x + x0, self.threeprime_y + y0, "3'")
+        if show_ends:
+            if self.fiveprime_x and self.fiveprime_y:
+                plt.text(self.fiveprime_x + nt_labels_offset[0], self.fiveprime_y + nt_labels_offset[1],
+                         five_prime_label, fontsize=fontsize)
+            if self.threeprime_x and self.threeprime_y:
+                plt.text(self.threeprime_x + nt_labels_offset[0], self.threeprime_y + nt_labels_offset[1],
+                         three_prime_label, fontsize=fontsize)
 
         ax.axis("off")
         return ax
