@@ -177,3 +177,21 @@ def get_pairmap(structure: str) -> list[int]:
             pairs_array[end_stack[-ii]] = pair_stack[ii]
 
     return pairs_array
+
+
+def get_strand_id(char: str) -> str:
+    """Determine strand id based on the delimiter.
+
+    Args:
+        char: Delimiter character.
+
+    Returns:
+        Strand id. "a" if the first strand, "b" if the second one.
+    """
+
+    if char in LEFT_DELIMITERS:
+        return "a"
+    elif char in RIGHT_DELIMITERS:
+        return "b"
+    else:
+        raise ValueError(f"Unexpected character in structure: {char}")
